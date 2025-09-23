@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+    <h1 class="text-center mb-4">Dashboard de Participación</h1>
+
+    <div class="row row-cols-1 row-cols-md-4 g-4 text-center mb-5">
+        <div class="col">
+            <div class="card h-100 p-3 shadow-sm bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total de Eventos</h5>
+                    <h2 class="card-text display-4">{{ total_eventos }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100 p-3 shadow-sm bg-info text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total de Miembros</h5>
+                    <h2 class="card-text display-4">{{ total_miembros }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100 p-3 shadow-sm bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Asistencia Promedio</h5>
+                    <h2 class="card-text display-4">{{ asistencia_promedio }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100 p-3 shadow-sm bg-warning text-dark">
+                <div class="card-body">
+                    <h5 class="card-title">Participación Total (%)</h5>
+                    <h2 class="card-text display-4">--</h2> </div>
+            </div>
+        </div>
+    </div>
+    <div class="card shadow p-4">
+        <h2 class="card-title text-center mb-4">Top 5 Miembros con Más Ausencias</h2>
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Nombres y Apellidos</th>
+                        <th>Ausencias</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for miembro in top_ausencias %}
+                    <tr>
+                        <td>{{ miembro.nombres }} {{ miembro.apellidos }}</td>
+                        <td>{{ miembro.total_ausencias }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="2" class="text-center">No hay datos de ausencias para mostrar.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}

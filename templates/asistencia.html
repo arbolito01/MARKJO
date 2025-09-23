@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block title %}Registrar Asistencia{% endblock %}
+{% block content %}
+<div class="card shadow p-4">
+    <h1 class="text-center mb-4">Registro de Asistencia</h1>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="alert alert-{{ messages[0][0] }}" role="alert">
+                {{ messages[0][1] }}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <form action="{{ url_for('procesar_asistencia') }}" method="post">
+        
+        <h2 class="mt-4">Selecciona el Evento</h2>
+        <div class="mb-3">
+            <select name="evento_id" id="evento_id" class="form-select" required>
+                {% for evento in eventos %}
+                <option value="{{ evento['id'] }}">{{ evento['nombre'] }} - {{ evento['fecha'] }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <h2 class="mt-4">Tipo de Registro</h2>
+        <div class="btn-group w-100 mb-3" role="group" aria-label="Tipo de Registro">
+            <input type="radio" class="btn-check" name="tipo_registro" id="entrada_btn" autocomplete="off" checked value="entrada">
+            <label class="btn btn-outline-success" for="entrada_btn">Entrada</label>
+        
+            <input type="radio" class="btn-check" name="tipo_registro" id="salida_btn" autocomplete="off" value="salida">
+            <label class="btn btn-outline-danger" for="salida_btn">Salida</label>
+        </div>
+
+        <div class="mb-3">
+            <label for="dni" class="form-label">DNI o Lector de Barras:</label>
+            <input type="text" class="form-control" id="dni" name="dni" required autofocus>
+            <div id="dniHelp" class="form-text">
+                Escanea el DNI para un registro rápido.
+            </div>
+        </div>
+
+        <div class="d-grid gap-2">
+            <button type="submit" class="btn btn-primary mt-3">Continuar</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

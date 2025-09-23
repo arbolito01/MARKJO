@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block title %}Lista de Miembros{% endblock %}
+{% block content %}
+    <div class="card shadow p-4">
+        <h1 class="text-center mb-4">Lista de Miembros</h1>
+        
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>DNI</th>
+                        <th>Nombres y Apellidos</th>
+                        <th>Sexo</th>
+                        <th>Edad</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for miembro in miembros %}
+                    <tr>
+                        <td>{{ miembro['dni'] }}</td>
+                        <td>{{ miembro['nombres'] }}</td>
+                        <td>{{ miembro['sexo'] }}</td>
+                        <td>{{ miembro['edad'] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="d-flex justify-content-end mt-3">
+            <a href="{{ url_for('crear_miembro') }}" class="btn btn-primary me-2">Crear Nuevo Miembro</a>
+            <a href="{{ url_for('cargar_miembros') }}" class="btn btn-success">Importar desde Archivo</a>
+        </div>
+    </div>
+{% endblock %}

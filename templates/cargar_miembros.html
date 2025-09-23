@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block title %}Importar Miembros{% endblock %}
+{% block content %}
+    <div class="card shadow p-4">
+        <h1 class="text-center mb-4">Importar Miembros desde Archivo</h1>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="alert alert-{{ messages[0][0] }}" role="alert">
+                    {{ messages[0][1] }}
+                </div>
+            {% endif %}
+        {% endwith %}
+        <form method="post" action="{{ url_for('cargar_miembros') }}" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label for="file" class="form-label">Selecciona el archivo Excel/CSV:</label>
+                <input type="file" class="form-control" id="file" name="file" required>
+                <div class="form-text mt-2">
+                    Asegúrate de que tu archivo contenga las siguientes columnas: DNI, Nombres, Apellidos, Sexo, Edad, Estado civil, Fecha de nacimiento, Carga Familiar.
+                </div>
+            </div>
+            <div class="d-grid gap-2">
+                <button type="submit" class="btn btn-primary">Cargar Archivo</button>
+            </div>
+        </form>
+    </div>
+{% endblock %}

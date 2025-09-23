@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block title %}Crear Evento{% endblock %}
+{% block content %}
+    <div class="card shadow p-4">
+        <h1 class="text-center mb-4">Crear Nuevo Evento</h1>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="alert alert-{{ messages[0][0] }}" role="alert">
+                    {{ messages[0][1] }}
+                </div>
+            {% endif %}
+        {% endwith %}
+        <form method="post" action="{{ url_for('crear_evento') }}">
+            <div class="mb-3">
+                <label for="nombre" class="form-label">Nombre del Evento:</label>
+                <input type="text" class="form-control" id="nombre" name="nombre" required>
+            </div>
+            <div class="mb-3">
+                <label for="fecha" class="form-label">Fecha:</label>
+                <input type="date" class="form-control" id="fecha" name="fecha" required>
+            </div>
+            <div class="mb-3">
+                <label for="tipo_evento" class="form-label">Tipo de Evento:</label>
+                <select id="tipo_evento" name="tipo_evento" class="form-select" required>
+                    <option value="Faena">Faena</option>
+                    <option value="Asamblea">Asamblea</option>
+                </select>
+            </div>
+            <div class="d-grid gap-2">
+                <button type="submit" class="btn btn-primary">Crear Evento</button>
+            </div>
+        </form>
+    </div>
+{% endblock %}

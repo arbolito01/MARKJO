@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block title %}Lista de Eventos{% endblock %}
+{% block content %}
+    <div class="card shadow p-4">
+        <h1 class="text-center mb-4">Lista de Eventos</h1>
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre</th>
+                        <th>Fecha</th>
+                        <th>Tipo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for evento in eventos %}
+                    <tr>
+                        <td>{{ evento['id'] }}</td>
+                        <td>{{ evento['nombre'] }}</td>
+                        <td>{{ evento['fecha'] }}</td>
+                        <td>{{ evento['tipo_evento'] }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="text-center">No hay eventos para mostrar.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="d-flex justify-content-end mt-3">
+            <a href="{{ url_for('crear_evento') }}" class="btn btn-primary">Crear Nuevo Evento</a>
+        </div>
+    </div>
+{% endblock %}
