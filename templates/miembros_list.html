@@ -21,6 +21,9 @@
                         <td>{{ miembro['nombres'] }}</td>
                         <td>{{ miembro['sexo'] }}</td>
                         <td>{{ miembro['edad'] }}</td>
+                        <td>
+                            <a href="{{ url_for('editar_miembro', dni=miembro['dni']) }}" class="btn btn-sm btn-warning">Editar</a>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>

@@ -16,10 +16,13 @@
         <p class="mb-1"><strong>Evento:</strong> {{ evento['nombre'] }} ({{ evento['fecha'] }})</p>
         <p class="mb-1"><strong>DNI:</strong> {{ miembro['dni'] }}</p>
         <p class="mb-0"><strong>Nombres:</strong> {{ miembro['nombres'] }}</p>
+        {% if hora_registro %}
+        <p class="mb-0"><strong>Hora de registro:</strong> {{ hora_registro }}</p>
+        {% endif %}
     </div>
     
-    <form action="{{ url_for('confirmar_asistencia', dni=miembro['dni'], evento_id=evento['id']) }}" method="post">
-        
+    <form action="{{ url_for('confirmar_asistencia', dni=miembro['dni'], evento_id=evento['id'], tipo_registro=tipo_registro) }}" method="post">
+
         <input type="hidden" name="dni" value="{{ miembro['dni'] }}">
         <input type="hidden" name="evento_id" value="{{ evento['id'] }}">
 

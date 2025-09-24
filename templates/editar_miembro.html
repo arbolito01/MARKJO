@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block title %}Editar Miembro{% endblock %}
+{% block content %}
+    <div class="card shadow p-4">
+        <h1 class="text-center mb-4">Editar Miembro</h1>
+        <form method="post" action="{{ url_for('editar_miembro', dni=miembro['dni']) }}">
+            <div class="mb-3">
+                <label for="dni" class="form-label">DNI:</label>
+                <input type="text" class="form-control" id="dni" name="dni" value="{{ miembro['dni'] }}" required readonly>
+            </div>
+            <div class="mb-3">
+                <label for="nombres" class="form-label">Nombres:</label>
+                <input type="text" class="form-control" id="nombres" name="nombres" value="{{ miembro['nombres'] }}" required>
+            </div>
+            <div class="mb-3">
+                <label for="apellidos" class="form-label">Apellidos:</label>
+                <input type="text" class="form-control" id="apellidos" name="apellidos" value="{{ miembro['apellidos'] }}" required>
+            </div>
+            <div class="d-grid gap-2">
+                <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+            </div>
+        </form>
+    </div>
+{% endblock %}

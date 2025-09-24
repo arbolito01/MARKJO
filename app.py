@@ -3,7 +3,7 @@ from flask_mysqldb import MySQL
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 import yaml
-from datetime import date
+from datetime import date, datetime
 import pandas as pd
 from io import StringIO
 import MySQLdb.cursors
@@ -44,12 +44,11 @@ class User(UserMixin):
 @login_manager.user_loader
 def load_user(user_id):
     """Carga un usuario desde la base de datos."""
-    cursor = mysql.connection.cursor()
-    cursor.execute("SELECT id, usuario, password FROM usuarios WHERE id = %s", (user_id,))
-    user_data = cursor.fetchone()
-    cursor.close()
-    if user_data:
-        return User(user_data[0], user_data[1], user_data[2])
+    with mysql.connection.cursor() as cursor:
+        cursor.execute("SELECT id, usuario, password FROM usuarios WHERE id = %s", (user_id,))
+        user_data = cursor.fetchone()
+        if user_data:
+            return User(user_data[0], user_data[1], user_data[2])
     return None
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -62,10 +61,9 @@ def login():
         usuario = request.form['usuario']
         password = request.form['password']
         
-        cursor = mysql.connection.cursor()
-        cursor.execute("SELECT id, usuario, password FROM usuarios WHERE usuario = %s", (usuario,))
-        user_data = cursor.fetchone()
-        cursor.close()
+        with mysql.connection.cursor() as cursor:
+            cursor.execute("SELECT id, usuario, password FROM usuarios WHERE usuario = %s", (usuario,))
+            user_data = cursor.fetchone()
         
         if user_data and check_password_hash(user_data[2], password):
             user = User(user_data[0], user_data[1], user_data[2])
@@ -87,14 +85,13 @@ def logout():
 def crear_admin():
     """Ruta para crear el primer usuario administrador."""
     password_hash = generate_password_hash('admin123')
-    cursor = mysql.connection.cursor()
     try:
-        cursor.execute("INSERT INTO usuarios (usuario, password) VALUES (%s, %s)", ('admin', password_hash))
-        mysql.connection.commit()
-        flash('Usuario administrador creado exitosamente!')
+        with mysql.connection.cursor() as cursor:
+            cursor.execute("INSERT INTO usuarios (usuario, password) VALUES (%s, %s)", ('admin', password_hash))
+            mysql.connection.commit()
+            flash('Usuario administrador creado exitosamente!')
     except Exception:
         flash('El usuario admin ya existe.')
-    cursor.close()
     return redirect(url_for('login'))
 
 # =========================================================================
@@ -104,98 +101,99 @@ def crear_admin():
 @login_required
 def index():
     """Ruta de inicio (dashboard con estadísticas)."""
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    with mysql.connection.cursor(MySQLdb.cursors.DictCursor) as cursor:
+        # 1. Total de eventos
+        cursor.execute("SELECT COUNT(*) as count FROM eventos")
+        total_eventos = cursor.fetchone()['count'] if cursor.rowcount > 0 else 0
 
-    # 1. Total de eventos
-    cursor.execute("SELECT COUNT(*) as count FROM eventos")
-    total_eventos = cursor.fetchone()['count'] if cursor.rowcount > 0 else 0
+        # 2. Total de miembros
+        cursor.execute("SELECT COUNT(*) as count FROM miembros")
+        total_miembros = cursor.fetchone()['count'] if cursor.rowcount > 0 else 0
 
-    # 2. Total de miembros
-    cursor.execute("SELECT COUNT(*) as count FROM miembros")
-    total_miembros = cursor.fetchone()['count'] if cursor.rowcount > 0 else 0
+        # 3. Ausencias por miembro (Top 5)
+        cursor.execute("""
+            SELECT m.nombres, m.apellidos, COUNT(a.asistio) AS total_ausencias
+            FROM miembros m
+            JOIN asistencia a ON m.dni = a.miembro_dni
+            WHERE a.asistio = FALSE
+            GROUP BY m.dni
+            ORDER BY total_ausencias DESC
+            LIMIT 5
+        """)
+        top_ausencias = cursor.fetchall()
+        
+        # 4. Asistencia promedio
+        cursor.execute("""
+            SELECT AVG(attendees) as promedio FROM (
+                SELECT COUNT(asistio) AS attendees
+                FROM asistencia
+                WHERE asistio = TRUE
+                GROUP BY evento_id
+            ) AS subquery
+        """)
+        asistencia_promedio_raw = cursor.fetchone()['promedio'] if cursor.rowcount > 0 else None
+        asistencia_promedio = f"{asistencia_promedio_raw:.2f}" if asistencia_promedio_raw is not None else "0.00"
 
-    # 3. Ausencias por miembro (Top 5)
-    cursor.execute("""
-        SELECT m.nombres, COUNT(a.asistio) AS total_ausencias
-        FROM miembros m
-        JOIN asistencia a ON m.dni = a.miembro_dni
-        WHERE a.asistio = FALSE
-        GROUP BY m.dni
-        ORDER BY total_ausencias DESC
-        LIMIT 5
-    """)
-    top_ausencias = cursor.fetchall()
-    
-    # 4. Asistencia promedio
-    cursor.execute("""
-        SELECT AVG(attendees) as promedio FROM (
-            SELECT COUNT(asistio) AS attendees
-            FROM asistencia
-            WHERE asistio = TRUE
-            GROUP BY evento_id
-        ) AS subquery
-    """)
-    asistencia_promedio_raw = cursor.fetchone()['promedio'] if cursor.rowcount > 0 else None
-    asistencia_promedio = f"{asistencia_promedio_raw:.2f}" if asistencia_promedio_raw is not None else "0.00"
-
-    cursor.close()
+    # Calcular participación total (%)
+    if total_miembros > 0:
+        participacion_total = ((total_miembros - len(top_ausencias)) / total_miembros) * 100
+    else:
+        participacion_total = 0
 
     return render_template('index.html', 
                            total_eventos=total_eventos, 
                            total_miembros=total_miembros, 
                            top_ausencias=top_ausencias, 
-                           asistencia_promedio=asistencia_promedio)
-
+                           asistencia_promedio=asistencia_promedio,
+                           participacion_total=f"{participacion_total:.2f}")
 
 # RUTA PARA MOSTRAR EL FORMULARIO DE ASISTENCIA (POR DNI)
 @app.route('/asistencia_form', methods=['GET'])
 @login_required
 def asistencia_form():
     """Muestra el formulario para registrar asistencia por DNI."""
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cursor.execute("SELECT id, nombre, fecha FROM eventos")
-    eventos = cursor.fetchall()
-    cursor.close()
+    with mysql.connection.cursor(MySQLdb.cursors.DictCursor) as cursor:
+        cursor.execute("SELECT id, nombre, fecha FROM eventos")
+        eventos = cursor.fetchall()
     
     return render_template('asistencia.html', eventos=eventos)
 
 # RUTA PARA CONFIRMAR ASISTENCIA DESPUÉS DE LA BÚSQUEDA POR DNI
-app.route('/confirmar_asistencia/<dni>/<evento_id>/<tipo_registro>', methods=['GET', 'POST'])
+@app.route('/confirmar_asistencia/<dni>/<evento_id>/<tipo_registro>', methods=['GET', 'POST'])
 @login_required
 def confirmar_asistencia(dni, evento_id, tipo_registro):
     """Valida el DNI y registra la entrada/salida."""
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    
-    # Obtiene los datos del evento
-    cursor.execute("SELECT id, nombre, fecha FROM eventos WHERE id = %s", (evento_id,))
-    evento = cursor.fetchone()
-    
-    # Busca al miembro por DNI y sus datos
-    cursor.execute("SELECT dni, nombres FROM miembros WHERE dni = %s", (dni,))
-    miembro = cursor.fetchone()
-
-    if not miembro:
-        flash('DNI no encontrado.', 'danger')
-        cursor.close()
-        return redirect(url_for('asistencia_form'))
+    with mysql.connection.cursor(MySQLdb.cursors.DictCursor) as cursor:
+        # Obtiene los datos del evento
+        cursor.execute("SELECT id, nombre, fecha FROM eventos WHERE id = %s", (evento_id,))
+        evento = cursor.fetchone()
         
-    if request.method == 'POST':
-        # Lógica para evitar registros duplicados de entrada
-        cursor.execute("SELECT COUNT(*) FROM asistencia WHERE miembro_dni = %s AND evento_id = %s AND tipo_registro = 'entrada'", (dni, evento_id))
-        if cursor.fetchone()['COUNT(*)'] > 0 and tipo_registro == 'entrada':
-            flash(f'El miembro {miembro["nombres"]} ya registró su entrada para este evento.', 'warning')
-            cursor.close()
+        # Busca al miembro por DNI y sus datos
+        cursor.execute("SELECT dni, nombres, apellidos FROM miembros WHERE dni = %s", (dni,))
+        miembro = cursor.fetchone()
+
+        if not miembro:
+            flash('DNI no encontrado.', 'danger')
             return redirect(url_for('asistencia_form'))
-        
-        # Insertar el nuevo registro
-        cursor.execute("INSERT INTO asistencia (miembro_dni, evento_id, asistio, tipo_registro) VALUES (%s, %s, TRUE, %s)", (dni, evento_id, tipo_registro))
-        mysql.connection.commit()
-        
-        flash(f'Registro de {miembro["nombres"]} ({tipo_registro}) exitoso para el evento {evento["nombre"]}.', 'success')
-        cursor.close()
-        return redirect(url_for('asistencia_form'))
+            
+        if request.method == 'POST':
+            # Lógica para evitar registros duplicados de entrada
+            cursor.execute("SELECT COUNT(*) as count FROM asistencia WHERE miembro_dni = %s AND evento_id = %s AND tipo_registro = 'entrada'", (dni, evento_id))
+            if cursor.fetchone()['count'] > 0 and tipo_registro == 'entrada':
+                flash(f'El miembro {miembro["nombres"]} ya registró su entrada para este evento.', 'warning')
+                return redirect(url_for('asistencia_form'))
+            
+            # Capturar la hora actual del registro y el ID del usuario
+            hora_registro = datetime.now()
+            registrador_id = current_user.id
+            
+            # Insertar el nuevo registro
+            cursor.execute("INSERT INTO asistencia (miembro_dni, evento_id, asistio, tipo_registro, fecha_registro, usuario_id) VALUES (%s, %s, TRUE, %s, %s, %s)", (dni, evento_id, tipo_registro, hora_registro, registrador_id))
+            mysql.connection.commit()
+            
+            flash(f'Registro de {miembro["nombres"]} ({tipo_registro}) exitoso para el evento {evento["nombre"]}.', 'success')
+            return redirect(url_for('asistencia_form'))
 
-    cursor.close()
     return render_template('confirmar_asistencia.html', miembro=miembro, evento=evento, tipo_registro=tipo_registro)
 
 
@@ -206,23 +204,21 @@ def registrar_asistencia():
     evento_id = request.form['evento_id']
     miembros_asistentes = request.form.getlist('asistio')
 
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    
-    # Obtener todos los DNI para el evento
-    cursor.execute("SELECT dni FROM miembros")
-    todos_miembros = [m['dni'] for m in cursor.fetchall()]
+    with mysql.connection.cursor(MySQLdb.cursors.DictCursor) as cursor:
+        # Obtener todos los DNI de los miembros
+        cursor.execute("SELECT dni FROM miembros")
+        todos_miembros = [m['dni'] for m in cursor.fetchall()]
 
-    # Insertar la asistencia de los presentes
-    for dni in miembros_asistentes:
-        cursor.execute("INSERT INTO asistencia (miembro_dni, evento_id, asistio) VALUES (%s, %s, TRUE)", (dni, evento_id))
-    
-    # Insertar la ausencia de los que no fueron marcados
-    miembros_ausentes = [dni for dni in todos_miembros if dni not in miembros_asistentes]
-    for dni in miembros_ausentes:
-        cursor.execute("INSERT INTO asistencia (miembro_dni, evento_id, asistio) VALUES (%s, %s, FALSE)", (dni, evento_id))
+        # Insertar la asistencia de los presentes
+        for dni in miembros_asistentes:
+            cursor.execute("INSERT INTO asistencia (miembro_dni, evento_id, asistio) VALUES (%s, %s, TRUE)", (dni, evento_id))
+        
+        # Insertar la ausencia de los que no fueron marcados
+        miembros_ausentes = [dni for dni in todos_miembros if dni not in miembros_asistentes]
+        for dni in miembros_ausentes:
+            cursor.execute("INSERT INTO asistencia (miembro_dni, evento_id, asistio) VALUES (%s, %s, FALSE)", (dni, evento_id))
 
-    mysql.connection.commit()
-    cursor.close()
+        mysql.connection.commit()
     
     flash('Asistencia registrada exitosamente.')
     return redirect(url_for('asistencia_form'))
@@ -231,32 +227,29 @@ def registrar_asistencia():
 @login_required
 def reportes():
     """Genera y muestra los reportes de asistencia."""
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    
-    # Reporte 1: Total de ausencias por miembro
-    cursor.execute("""
-        SELECT m.nombres, COUNT(a.asistio) AS total_ausencias
-        FROM miembros m
-        JOIN asistencia a ON m.dni = a.miembro_dni
-        WHERE a.asistio = FALSE
-        GROUP BY m.dni
-        ORDER BY total_ausencias DESC
-    """)
-    reporte_ausencias = cursor.fetchall()
-    
-    # Reporte 2: Asistencia por evento
-    cursor.execute("""
-        SELECT e.nombre, e.fecha, 
-               SUM(CASE WHEN a.asistio = TRUE THEN 1 ELSE 0 END) AS presentes,
-               SUM(CASE WHEN a.asistio = FALSE THEN 1 ELSE 0 END) AS ausentes
-        FROM eventos e
-        JOIN asistencia a ON e.id = a.evento_id
-        GROUP BY e.id
-        ORDER BY e.fecha DESC
-    """)
-    reporte_asistencia_evento = cursor.fetchall()
-
-    cursor.close()
+    with mysql.connection.cursor(MySQLdb.cursors.DictCursor) as cursor:
+        # Reporte 1: Total de ausencias por miembro
+        cursor.execute("""
+            SELECT m.nombres, m.apellidos, COUNT(a.asistio) AS total_ausencias
+            FROM miembros m
+            JOIN asistencia a ON m.dni = a.miembro_dni
+            WHERE a.asistio = FALSE
+            GROUP BY m.dni
+            ORDER BY total_ausencias DESC
+        """)
+        reporte_ausencias = cursor.fetchall()
+        
+        # Reporte 2: Asistencia por evento
+        cursor.execute("""
+            SELECT e.nombre, e.fecha, 
+                   SUM(CASE WHEN a.asistio = TRUE THEN 1 ELSE 0 END) AS presentes,
+                   SUM(CASE WHEN a.asistio = FALSE THEN 1 ELSE 0 END) AS ausentes
+            FROM eventos e
+            JOIN asistencia a ON e.id = a.evento_id
+            GROUP BY e.id
+            ORDER BY e.fecha DESC
+        """)
+        reporte_asistencia_evento = cursor.fetchall()
     
     return render_template('reportes.html',
                            reporte_ausencias=reporte_ausencias,
@@ -271,15 +264,13 @@ def crear_evento():
         fecha = request.form['fecha']
         tipo_evento = request.form['tipo_evento']
         
-        cursor = mysql.connection.cursor()
         try:
-            cursor.execute("INSERT INTO eventos (nombre, fecha, tipo_evento) VALUES (%s, %s, %s)", (nombre, fecha, tipo_evento))
-            mysql.connection.commit()
+            with mysql.connection.cursor() as cursor:
+                cursor.execute("INSERT INTO eventos (nombre, fecha, tipo_evento) VALUES (%s, %s, %s)", (nombre, fecha, tipo_evento))
+                mysql.connection.commit()
             flash('Evento creado exitosamente.', 'success')
         except Exception as e:
             flash(f'Error al crear el evento: {str(e)}', 'error')
-        finally:
-            cursor.close()
         
         return redirect(url_for('crear_evento'))
     
@@ -292,24 +283,23 @@ def crear_miembro():
     if request.method == 'POST':
         dni = request.form['dni']
         nombres = request.form['nombres']
+        apellidos = request.form['apellidos']
         sexo = request.form['sexo']
         edad = request.form['edad']
         estado_civil = request.form['estado_civil']
         fecha_nacimiento = request.form['fecha_nacimiento']
         carga_familiar = request.form.get('carga_familiar', 0)
         
-        cursor = mysql.connection.cursor()
         try:
-            cursor.execute("""
-                INSERT INTO miembros (dni, nombres, sexo, edad, estado_civil, fecha_nacimiento, carga_familiar) 
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (dni, nombres, sexo, edad, estado_civil, fecha_nacimiento, carga_familiar))
-            mysql.connection.commit()
+            with mysql.connection.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO miembros (dni, nombres, apellidos, sexo, edad, estado_civil, fecha_nacimiento, carga_familiar) 
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """, (dni, nombres, apellidos, sexo, edad, estado_civil, fecha_nacimiento, carga_familiar))
+                mysql.connection.commit()
             flash('Miembro creado exitosamente.', 'success')
         except Exception as e:
             flash(f'Error al crear el miembro: {str(e)}', 'error')
-        finally:
-            cursor.close()
         
         return redirect(url_for('crear_miembro'))
     
@@ -319,11 +309,9 @@ def crear_miembro():
 @login_required
 def miembros_list():
     """Muestra una lista de todos los miembros."""
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    # La consulta ahora pide solo 'nombres'
-    cursor.execute("SELECT dni, nombres, edad, sexo FROM miembros ORDER BY nombres")
-    miembros = cursor.fetchall()
-    cursor.close()
+    with mysql.connection.cursor(MySQLdb.cursors.DictCursor) as cursor:
+        cursor.execute("SELECT dni, nombres, apellidos, edad, sexo FROM miembros ORDER BY apellidos, nombres")
+        miembros = cursor.fetchall()
     
     return render_template('miembros_list.html', miembros=miembros)
 
@@ -343,8 +331,12 @@ def cargar_miembros():
         if file:
             try:
                 # Lee el archivo CSV o Excel
-                df = pd.read_csv(file)
-                
+                if file.filename.endswith('.xlsx'):
+                    df = pd.read_excel(file)
+                else: # Asumimos CSV
+                    data_str = file.read().decode('utf-8')
+                    df = pd.read_csv(StringIO(data_str))
+
                 # Renombra las columnas de forma segura
                 df.columns = df.columns.str.strip().str.replace('"', '').str.replace('.', '', regex=False).str.replace(' ', '_').str.lower()
 
@@ -377,29 +369,29 @@ def cargar_miembros():
                 df['nombres'] = df['nombre_completo'].apply(lambda x: str(x).split(' ')[-1] if pd.notna(x) else None)
 
                 # Inserta los datos en la base de datos
-                cursor = mysql.connection.cursor()
-                for _, row in df.iterrows():
-                    try:
-                        cursor.execute("""
-                            INSERT INTO miembros (dni, nombres, sexo, edad, estado_civil, fecha_nacimiento, carga_familiar) 
-                            VALUES (%s, %s, %s, %s, %s, %s, %s)
-                        """, (
-                            row['dni'],
-                            row['nombres'],
-                            row['sexo'],
-                            row['edad'],
-                            row['estado_civil'],
-                            row['fecha_nacimiento'],
-                            row['carga_familiar']
-                        ))
-                    except Exception as e:
-                        print(f"Error al insertar el miembro con DNI {row['dni']}: {str(e)}")
-                        mysql.connection.rollback()
-                        continue
-                
-                mysql.connection.commit()
-                cursor.close()
-                flash(f'Se cargaron {len(df)} miembros exitosamente.', 'success')
+                with mysql.connection.cursor() as cursor:
+                    for _, row in df.iterrows():
+                        try:
+                            cursor.execute("""
+                                INSERT INTO miembros (dni, nombres, apellidos, sexo, edad, estado_civil, fecha_nacimiento, carga_familiar) 
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                            """, (
+                                row['dni'],
+                                row['nombres'],
+                                row['apellidos'],
+                                row['sexo'],
+                                row['edad'],
+                                row['estado_civil'],
+                                row['fecha_nacimiento'],
+                                row['carga_familiar']
+                            ))
+                        except Exception as e:
+                            print(f"Error al insertar el miembro con DNI {row['dni']}: {str(e)}")
+                            mysql.connection.rollback()
+                            continue
+                    
+                    mysql.connection.commit()
+                    flash(f'Se cargaron {len(df)} miembros exitosamente.', 'success')
                 return redirect(url_for('miembros_list'))
             except Exception as e:
                 flash(f'Error al procesar el archivo: {str(e)}. Asegúrate de que el formato sea correcto.', 'danger')
@@ -420,12 +412,49 @@ def procesar_asistencia():
 @app.route('/eventos')
 @login_required
 def eventos_list():
-  cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-  cursor.execute("SELECT id, nombre, fecha, tipo_evento FROM eventos ORDER BY fecha DESC")
-  eventos = cursor.fetchall()
-  cursor.close()
+  with mysql.connection.cursor(MySQLdb.cursors.DictCursor) as cursor:
+    cursor.execute("SELECT id, nombre, fecha, tipo_evento FROM eventos ORDER BY fecha DESC")
+    eventos = cursor.fetchall()
  
   return render_template('eventos_list.html', eventos=eventos)
+
+@app.route('/editar_miembro/<dni>', methods=['GET', 'POST'])
+@login_required
+def editar_miembro(dni):
+    with mysql.connection.cursor(MySQLdb.cursors.DictCursor) as cursor:
+        # 1. Obtener los datos del miembro por su DNI
+        cursor.execute("SELECT * FROM miembros WHERE dni = %s", (dni,))
+        miembro = cursor.fetchone()
+
+        if not miembro:
+            flash('Miembro no encontrado.', 'danger')
+            return redirect(url_for('miembros_list'))
+
+        if request.method == 'POST':
+            # 2. Tomar los datos actualizados del formulario
+            nombres = request.form['nombres']
+            apellidos = request.form['apellidos']
+            sexo = request.form['sexo']
+            edad = request.form['edad']
+            estado_civil = request.form['estado_civil']
+            fecha_nacimiento = request.form['fecha_nacimiento']
+            carga_familiar = request.form.get('carga_familiar', 0)
+
+            # 3. Ejecutar la consulta de actualización (UPDATE)
+            try:
+                cursor.execute("""
+                    UPDATE miembros
+                    SET nombres = %s, apellidos = %s, sexo = %s, edad = %s, estado_civil = %s, fecha_nacimiento = %s, carga_familiar = %s
+                    WHERE dni = %s
+                """, (nombres, apellidos, sexo, edad, estado_civil, fecha_nacimiento, carga_familiar, dni))
+                mysql.connection.commit()
+                flash('Miembro actualizado exitosamente.', 'success')
+                return redirect(url_for('miembros_list'))
+            except Exception as e:
+                flash(f'Error al actualizar el miembro: {str(e)}', 'error')
+
+    # Si es un GET request, renderizar el formulario con los datos del miembro
+    return render_template('editar_miembro.html', miembro=miembro)
 
 # =========================================================================
 # 4. Bloque de ejecución principal
