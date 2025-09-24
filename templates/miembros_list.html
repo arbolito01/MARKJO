@@ -12,18 +12,24 @@
                         <th>Nombres y Apellidos</th>
                         <th>Sexo</th>
                         <th>Edad</th>
+                        <th>Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for miembro in miembros %}
                     <tr>
                         <td>{{ miembro['dni'] }}</td>
-                        <td>{{ miembro['nombres'] }}</td>
+                        <td>{{ miembro['nombres'] }} {{ miembro['apellidos'] }}</td>
                         <td>{{ miembro['sexo'] }}</td>
                         <td>{{ miembro['edad'] }}</td>
                         <td>
-                            <a href="{{ url_for('editar_miembro', dni=miembro['dni']) }}" class="btn btn-sm btn-warning">Editar</a>
+                            <a href="{{ url_for('editar_miembro', dni=miembro['dni']) }}" class="btn btn-sm btn-warning me-2">Editar</a>
+                            <a href="{{ url_for('crear_usuario_miembro', dni=miembro['dni']) }}" class="btn btn-sm btn-info">Asignar Rol</a>
                         </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center">No hay miembros para mostrar.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

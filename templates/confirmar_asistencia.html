@@ -26,19 +26,7 @@
         <input type="hidden" name="dni" value="{{ miembro['dni'] }}">
         <input type="hidden" name="evento_id" value="{{ evento['id'] }}">
 
-        <div class="mb-3">
-            <label class="form-label">Tipo de Registro:</label>
-            <div class="d-flex justify-content-around">
-                <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="radio" name="tipo_registro" id="entrada" value="entrada" required {% if tipo_registro == 'entrada' %}checked{% endif %}>
-                    <label class="form-check-label" for="entrada">Entrada</label>
-                </div>
-                <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="radio" name="tipo_registro" id="salida" value="salida" required {% if tipo_registro == 'salida' %}checked{% endif %}>
-                    <label class="form-check-label" for="salida">Salida</label>
-                </div>
-            </div>
-        </div>
+        
         <div class="d-grid gap-2">
             <button type="submit" class="btn btn-success mt-3">Registrar</button>
         </div>

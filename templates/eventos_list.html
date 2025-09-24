@@ -11,7 +11,7 @@
                         <th>Nombre</th>
                         <th>Fecha</th>
                         <th>Tipo</th>
-                    </tr>
+                        <th>Acciones</th> </tr>
                 </thead>
                 <tbody>
                     {% for evento in eventos %}
@@ -20,10 +20,12 @@
                         <td>{{ evento['nombre'] }}</td>
                         <td>{{ evento['fecha'] }}</td>
                         <td>{{ evento['tipo_evento'] }}</td>
-                    </tr>
+                        <td>
+                            <a href="{{ url_for('detalle_evento', evento_id=evento['id']) }}" class="btn btn-sm btn-info">Ver Detalles</a>
+                        </td> </tr>
                     {% else %}
                     <tr>
-                        <td colspan="4" class="text-center">No hay eventos para mostrar.</td>
+                        <td colspan="5" class="text-center">No hay eventos para mostrar.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

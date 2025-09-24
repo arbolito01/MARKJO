@@ -3,6 +3,13 @@
 {% block content %}
     <div class="card shadow p-4">
         <h1 class="text-center mb-4">Editar Miembro</h1>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="alert alert-{{ messages[0][0] }}" role="alert">
+                    {{ messages[0][1] }}
+                </div>
+            {% endif %}
+        {% endwith %}
         <form method="post" action="{{ url_for('editar_miembro', dni=miembro['dni']) }}">
             <div class="mb-3">
                 <label for="dni" class="form-label">DNI:</label>
@@ -15,6 +22,29 @@
             <div class="mb-3">
                 <label for="apellidos" class="form-label">Apellidos:</label>
                 <input type="text" class="form-control" id="apellidos" name="apellidos" value="{{ miembro['apellidos'] }}" required>
+            </div>
+            <div class="mb-3">
+                <label for="sexo" class="form-label">Sexo:</label>
+                <select id="sexo" name="sexo" class="form-select">
+                    <option value="M" {% if miembro['sexo'] == 'M' %}selected{% endif %}>Masculino</option>
+                    <option value="F" {% if miembro['sexo'] == 'F' %}selected{% endif %}>Femenino</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label for="edad" class="form-label">Edad:</label>
+                <input type="number" class="form-control" id="edad" name="edad" value="{{ miembro['edad'] }}">
+            </div>
+            <div class="mb-3">
+                <label for="estado_civil" class="form-label">Estado Civil:</label>
+                <input type="text" class="form-control" id="estado_civil" name="estado_civil" value="{{ miembro['estado_civil'] }}">
+            </div>
+            <div class="mb-3">
+                <label for="fecha_nacimiento" class="form-label">Fecha de Nacimiento:</label>
+                <input type="date" class="form-control" id="fecha_nacimiento" name="fecha_nacimiento" value="{{ miembro['fecha_nacimiento'] }}">
+            </div>
+            <div class="mb-3">
+                <label for="carga_familiar" class="form-label">Carga Familiar:</label>
+                <input type="number" class="form-control" id="carga_familiar" name="carga_familiar" value="{{ miembro['carga_familiar'] }}">
             </div>
             <div class="d-grid gap-2">
                 <button type="submit" class="btn btn-primary">Guardar Cambios</button>

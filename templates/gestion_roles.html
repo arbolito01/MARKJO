@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% block title %}Gestión de Roles{% endblock %}
+{% block content %}
+    <div class="card shadow p-4">
+        <h1 class="text-center mb-4">Gestión de Roles</h1>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="alert alert-{{ messages[0][0] }}" role="alert">
+                    {{ messages[0][1] }}
+                </div>
+            {% endif %}
+        {% endwith %}
+        
+        <form class="mb-4" method="get" action="{{ url_for('gestion_roles') }}">
+            <div class="input-group">
+                <input type="text" class="form-control" name="query" placeholder="Buscar por nombre de usuario..." value="{{ search_query }}">
+                <button class="btn btn-outline-primary" type="submit">Buscar</button>
+                <a href="{{ url_for('gestion_roles') }}" class="btn btn-outline-secondary">Limpiar</a>
+            </div>
+        </form>
+
+        <form method="post" action="{{ url_for('gestion_roles') }}">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th>
+                            <th>Usuario</th>
+                            <th>Rol Actual</th>
+                            <th>Cambiar Rol</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in usuarios %}
+                        <tr>
+                            <td>{{ user.id }}</td>
+                            <td>{{ user.usuario }}</td>
+                            <td>{{ user.rol }}</td>
+                            <td>
+                                <select name="rol_{{ user.id }}" class="form-select">
+                                    <option value="admin" {% if user.rol == 'admin' %}selected{% endif %}>Admin</option>
+                                    <option value="registrador" {% if user.rol == 'registrador' %}selected{% endif %}>Registrador</option>
+                                    <option value="usuario" {% if user.rol == 'usuario' %}selected{% endif %}>Usuario</option>
+                                </select>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center">No se encontraron usuarios con ese criterio.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="d-grid gap-2 mt-3">
+                <button type="submit" class="btn btn-success">Guardar Cambios</button>
+            </div>
+        </form>
+    </div>
+{% endblock %}
